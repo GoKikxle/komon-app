@@ -2,9 +2,25 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { useDraft } from '../hooks/useDraft';
 import { createSplitBill } from '../data/gatherings';
 import type { PayMethod } from '../lib/database.types';
 import { BackLink } from '../components/BackLink';
+
+// Everything useDraft.ts (see that file) persists for this flow — every
+// field here is a plain string/primitive already, no File/blob-URL issue
+// the way Create.tsx's cover image has.
+interface SplitBillDraft {
+  step: number;
+  label: string;
+  totalAmount: string;
+  dateMode: 'today' | 'custom';
+  customDate: string;
+  numberOfPeople: string;
+  splitMethod: 'equal' | 'dutch';
+  payMethod: PayMethod;
+  payHandle: string;
+}
 
 const TOTAL_STEPS = 4;
 
@@ -36,6 +52,23 @@ export function SplitBillCreate() {
   const [payMethod, setPayMethod] = useState<PayMethod>('venmo');
   const [payHandle, setPayHandle] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const { restored: draftRestored, markSubmitted: markDraftSubmitted, discard: discardDraft } = useDraft<SplitBillDraft>({
+    key: userId ? `komon-draft-create-splitbill-${userId}` : '',
+    enabled: Boolean(userId),
+    value: { step, label, totalAmount, dateMode, customDate, numberOfPeople, splitMethod, payMethod, payHandle },
+    onRestore: (d) => {
+      setStep(d.step);
+      setLabel(d.label);
+      setTotalAmount(d.totalAmount);
+      setDateMode(d.dateMode);
+      setCustomDate(d.customDate);
+      setNumberOfPeople(d.numberOfPeople);
+      setSplitMethod(d.splitMethod);
+      setPayMethod(d.payMethod);
+      setPayHandle(d.payHandle);
+    },
+  });
 
   const amountNumber = Number(totalAmount) || 0;
   const peopleNumber = Number(numberOfPeople) || 0;
@@ -74,6 +107,7 @@ export function SplitBillCreate() {
         payMethod,
         payHandle,
       });
+      markDraftSubmitted();
       navigate(`/created/${id}`);
     } catch (err) {
       console.error(err);
@@ -105,6 +139,15 @@ export function SplitBillCreate() {
           <div key={n} className={`wizard-dot${n === step ? ' active' : n < step ? ' done' : ''}`} />
         ))}
       </div>
+
+      {draftRestored && (
+        <div className="draft-banner" style={{ maxWidth: 480 }}>
+          <span>Continuing where you left off.</span>
+          <button type="button" className="link-btn" onClick={discardDraft}>
+            Start fresh instead
+          </button>
+        </div>
+      )}
 
       <div className="panel" style={{ maxWidth: 480 }}>
         {step === 1 && (

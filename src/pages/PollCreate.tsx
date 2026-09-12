@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Switch } from '@base-ui/react/switch';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { useDraft } from '../hooks/useDraft';
 import { BackLink } from '../components/BackLink';
 import {
   createPoll,
@@ -61,6 +62,32 @@ function draftFromOption(o: AliasPollOption): DraftOption {
 // targeted — "+ Add option" below disables itself once this is hit, same
 // spot removeOption already floors at 2 (options.length > 2 there).
 const MAX_POLL_OPTIONS = 3;
+
+// What useDraft.ts (see that file) persists for create mode — label,
+// linkUrl, and linkMeta only. imageFile (a File) isn't JSON-serializable,
+// and imagePreview, for a freshly-picked local file, is a blob: URL that
+// dies the moment the tab reloads — same reasoning as Create.tsx's own
+// cover-image exclusion. A restored draft's options come back with no
+// image; the organizer just re-adds it.
+interface PollDraftOption {
+  label: string;
+  linkUrl: string;
+  linkMeta: LinkMeta | null;
+}
+
+interface PollDraft {
+  title: string;
+  options: PollDraftOption[];
+  allowMessages: boolean;
+  suspenseMode: boolean;
+  commentsLive: boolean;
+  durationMs: number;
+}
+
+function draftOptionFromPersisted(o: PollDraftOption): DraftOption {
+  optKeySeq += 1;
+  return { key: `opt${optKeySeq}`, label: o.label, imageFile: null, imagePreview: null, linkUrl: o.linkUrl, linkMeta: o.linkMeta, linkChecking: false };
+}
 
 // No duration-picker Figma frame exists for this — built from Komon's
 // existing .radio-group/.radio-chip pattern (Create.tsx's Split Method /
@@ -155,6 +182,32 @@ export function PollCreate() {
       mounted = false;
     };
   }, [id]);
+
+  // Create mode only (enabled: !isEditMode) — an existing poll being
+  // edited always loads from the effect above, never from a local draft;
+  // this hook is simply never engaged on the /poll/:id/edit route, so
+  // there's no ordering to get right between the two, only mutual
+  // exclusion by route.
+  const { restored: draftRestored, markSubmitted: markDraftSubmitted, discard: discardDraft } = useDraft<PollDraft>({
+    key: userId ? `komon-draft-create-poll-${userId}` : '',
+    enabled: !isEditMode && Boolean(userId),
+    value: {
+      title,
+      options: options.map((o) => ({ label: o.label, linkUrl: o.linkUrl, linkMeta: o.linkMeta })),
+      allowMessages,
+      suspenseMode,
+      commentsLive,
+      durationMs,
+    },
+    onRestore: (d) => {
+      setTitle(d.title);
+      setOptions(d.options.length ? d.options.map(draftOptionFromPersisted) : [newOption(), newOption()]);
+      setAllowMessages(d.allowMessages);
+      setSuspenseMode(d.suspenseMode);
+      setCommentsLive(d.commentsLive);
+      setDurationMs(d.durationMs);
+    },
+  });
 
   function updateOption(key: string, patch: Partial<DraftOption>) {
     setOptions((prev) => prev.map((o) => (o.key === key ? { ...o, ...patch } : o)));
@@ -318,6 +371,7 @@ export function PollCreate() {
         closesAt: new Date(Date.now() + durationMs).toISOString(),
         options: resolvedOptions,
       });
+      markDraftSubmitted();
       navigate(`/poll/${pollId}/created`);
     } catch (err) {
       console.error(err);
@@ -376,6 +430,18 @@ export function PollCreate() {
                 No group chat, no shared contacts. Anyone with the link can vote under an alias — you're the only one who
                 ever sees a real name.
               </p>
+            )}
+
+            {/* Create mode only — draftRestored can never be true in edit
+                mode (useDraft's `enabled` above is gated on !isEditMode),
+                so no isEditMode check is needed here too. */}
+            {draftRestored && (
+              <div className="draft-banner">
+                <span>Continuing where you left off.</span>
+                <button type="button" className="link-btn" onClick={discardDraft}>
+                  Start fresh instead
+                </button>
+              </div>
             )}
 
             <div className="field">

@@ -241,6 +241,18 @@ h2 { font-weight: 600; font-size: 20px; line-height: 28px; letter-spacing: -.1px
 .wizard-dot.done { background: var(--ink-soft); }
 .lede { color: var(--ink-soft); font-size: 15px; max-width: 46ch; margin: 0 0 28px; }
 
+/* Shown across all three creation flows (Create.tsx, SplitBillCreate.tsx,
+   PollCreate.tsx's create mode) when useDraft.ts restores a saved draft —
+   see that hook's own header comment for why this exists. Plain and
+   low-key on purpose: this is routine, not a warning. */
+.draft-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: #f4f2ee; border: 1px solid #ede9e2; border-radius: 10px;
+  padding: 10px 14px; margin-bottom: 18px;
+  font-size: 13px; color: var(--ink-soft);
+}
+.draft-banner .link-btn { font-size: 13px; white-space: nowrap; }
+
 /* Pushpin — shape/shadow/highlight unchanged; only its fill goes neutral
    now that it's no longer doing category color-coding. */
 .pin {
@@ -319,6 +331,18 @@ input[type=text], input[type=email], input[type=number], input[type=date], input
 textarea { resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255, 45, 85, .14); outline: none; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+/* Create.tsx's own Date/Time row only — .row2 is shared with Edit.tsx
+   (untouched here on purpose), so this is scoped through .create-page,
+   not a bare .row2 override. Side-by-side at 14px gets uncomfortably
+   tight for two full-width date/time inputs once the column itself
+   narrows on mobile; stacked (Date above Time, same gap='.field's own
+   18px margin as everywhere else) is comfortably legible and tappable
+   at 390px, the width prior mobile passes (PRs #6, #10) were verified
+   at. Reuses the existing 430px breakpoint (see the waitlist/board
+   blocks elsewhere in this file) rather than introducing a new one. */
+@media (max-width: 430px) {
+  .create-page .row2 { grid-template-columns: 1fr; gap: 0; }
+}
 .cats { display: flex; flex-wrap: wrap; gap: 8px; }
 /* Category chips: selection no longer varies by category — every chip
    lights up with the same single accent when chosen, exactly like every
