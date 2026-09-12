@@ -411,7 +411,6 @@ export function Create() {
                     {(
                       [
                         ['equal', 'Equal split'],
-                        ['custom', 'Set amount per person'],
                         ['itemized', 'Itemized'],
                       ] as [SplitMethod, string][]
                     ).map(([key, label]) => (

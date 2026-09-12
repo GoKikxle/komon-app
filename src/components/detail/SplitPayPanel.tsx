@@ -2,7 +2,7 @@ import { Switch } from '@base-ui/react/switch';
 import type { GatheringWithRelations, Rsvp } from '../../lib/database.types';
 import { PaidRing } from '../PaidRing';
 import { payLabel, buildPayUrl } from '../../lib/constants';
-import { activeRsvps, markPaid, markPaidSent, paidPct, toggleReminder } from '../../data/gatherings';
+import { activeRsvps, markPaid, markPaidSent, paidPct, splitBillPerPerson, toggleReminder } from '../../data/gatherings';
 import { useToast } from '../../hooks/useToast';
 
 export function SplitPayPanel({
@@ -10,21 +10,39 @@ export function SplitPayPanel({
   myRsvp,
   onChange,
   readOnly = false,
+  isOrganizer = false,
 }: {
   gathering: GatheringWithRelations;
   myRsvp: Rsvp | undefined;
   onChange: () => void;
   readOnly?: boolean;
+  // Gates the total-cost line and the itemized cost-item breakdown below
+  // (see the "Total"/"Itemized" JSX further down) — a guest should only
+  // ever see their own share or (for the unrelated Split Bill "dutch"
+  // flow, SplitBillPayPanel.tsx) an open amount field, never the total,
+  // and an itemized list is just the total broken into parts a guest
+  // could still sum themselves.
+  isOrganizer?: boolean;
 }) {
   const toast = useToast();
   const going = activeRsvps(gathering);
   const paidCount = going.filter((r) => r.paid).length;
   const pct = paidPct(gathering, paidCount);
 
+  // Against the gathering's capacity (the headcount the organizer set at
+  // creation), not however many have RSVP'd so far — same
+  // splitBillPerPerson() the unrelated Split Bill quick-create flow
+  // already uses for exactly this reason (see its own doc comment: "used
+  // both for what a guest owes... and for totaling up equal-split
+  // progress"). This used to divide by going.length instead, so a bill's
+  // per-person share dropped every time someone new RSVPed, rather than
+  // staying fixed against the number of people it was actually planned
+  // for. 'custom' ("Set amount per person") is no longer offered when
+  // creating/editing a gathering, but existing 'custom' rows keep this
+  // same fixed-amount, no-division behavior they always had — see
+  // Edit.tsx's own comment on why those aren't migrated.
   const perPerson =
-    gathering.split_method === 'custom'
-      ? gathering.cost_total.toFixed(2)
-      : (gathering.cost_total / Math.max(going.length, 1)).toFixed(2);
+    gathering.split_method === 'custom' ? gathering.cost_total.toFixed(2) : splitBillPerPerson(gathering).toFixed(2);
 
   const splitLabel =
     gathering.split_method === 'equal'
@@ -78,9 +96,14 @@ export function SplitPayPanel({
         <span className="split-amt">£{perPerson}</span>
         <span className="split-pill">{splitLabel}</span>
       </div>
-      <p className="poll-hint" style={{ marginTop: 0 }}>Total £{gathering.cost_total.toFixed(2)}</p>
+      {/* Organizer-only from here — a guest should only ever see their
+          own share (above) or, for the unrelated Split Bill "dutch" flow,
+          an open amount field, never the total. An itemized breakdown is
+          just the total split into parts a guest could still add up
+          themselves, so it's gated the same way. */}
+      {isOrganizer && <p className="poll-hint" style={{ marginTop: 0 }}>Total £{gathering.cost_total.toFixed(2)}</p>}
 
-      {gathering.split_method === 'itemized' && gathering.cost_items.length > 0 && (
+      {isOrganizer && gathering.split_method === 'itemized' && gathering.cost_items.length > 0 && (
         <ul className="item-breakdown">
           {gathering.cost_items.map((item) => (
             <li key={item.id}>

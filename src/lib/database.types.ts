@@ -3,6 +3,10 @@ export type Visibility = 'public' | 'private' | 'invited';
 export type CostMode = 'split_pay' | 'get_tix';
 // 'dutch': each guest types their own amount (Split Bill only) rather than
 // Komon computing an equal share or the organizer setting one per person.
+// 'custom' ("Set amount per person") is legacy — no longer offered in
+// Create.tsx/Edit.tsx's split-method picker, kept here only because
+// existing gatherings created with it still need to render correctly
+// (SplitPayPanel.tsx still has a branch for it) and weren't migrated.
 export type SplitMethod = 'equal' | 'custom' | 'itemized' | 'dutch';
 export type PayMode = 'direct' | 'stripe';
 export type PayMethod = 'venmo' | 'paypal' | 'cashapp' | 'monzo' | 'revolut';

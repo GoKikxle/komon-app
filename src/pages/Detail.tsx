@@ -180,7 +180,7 @@ export function Detail() {
           )}
 
           {!isSplitBill && gathering.cost_enabled && (
-            <SplitPayPanel gathering={gathering} myRsvp={myRsvp} onChange={load} readOnly={isCancelled} />
+            <SplitPayPanel gathering={gathering} myRsvp={myRsvp} onChange={load} readOnly={isCancelled} isOrganizer={isOrganizer} />
           )}
         </div>
       </div>

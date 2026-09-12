@@ -76,6 +76,13 @@ export function Edit() {
         setVisibility(g.visibility);
         setEmails(g.invited_emails.map((e) => e.email));
         setCostEnabled(g.cost_enabled);
+        // 'custom' ("Set amount per person") is no longer offered in the
+        // radio group below, but a gathering created before its removal
+        // can still have it here — seeding it as-is (rather than coercing
+        // to 'equal') means re-saving without touching this field leaves
+        // that bill's math untouched; no chip just shows as selected. See
+        // the PR that removed the option for why existing 'custom' rows
+        // aren't migrated.
         setCostMethod(g.split_method);
         setCostTotal(g.split_method === 'itemized' ? '' : String(g.cost_total || ''));
         setItems(g.cost_items.map((it) => ({ name: it.name, amount: String(it.amount) })));
@@ -362,7 +369,6 @@ export function Edit() {
                 {(
                   [
                     ['equal', 'Equal split'],
-                    ['custom', 'Set amount per person'],
                     ['itemized', 'Itemized'],
                   ] as [SplitMethod, string][]
                 ).map(([key, label]) => (
