@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Switch } from '@base-ui/react/switch';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { useDraft } from '../hooks/useDraft';
 import { CATS, fmtDate } from '../lib/constants';
 import { createGathering, uploadCoverImage } from '../data/gatherings';
 import type { Category, PayMethod, SplitMethod, Visibility } from '../lib/database.types';
@@ -11,6 +12,35 @@ import { BackLink } from '../components/BackLink';
 interface ItemRow {
   name: string;
   amount: string;
+}
+
+// Everything useDraft.ts (see that file) persists for this flow — the
+// cover image is deliberately excluded: imageFile is a File (not
+// JSON-serializable) and imagePreview, for a freshly-picked file, is a
+// blob: URL that dies the moment the tab reloads. A restored draft comes
+// back with no image; the organizer just re-picks it, same as if they'd
+// never chosen one.
+interface CreateDraft {
+  step: number;
+  title: string;
+  cat: Category;
+  date: string;
+  time: string;
+  location: string;
+  capacity: string;
+  visibility: Visibility;
+  emails: string[];
+  costEnabled: boolean;
+  costMethod: SplitMethod;
+  costTotal: string;
+  items: ItemRow[];
+  payMethod: PayMethod;
+  payHandle: string;
+  pollEnabled: boolean;
+  pollQ: string;
+  opt1: string;
+  opt2: string;
+  opt3: string;
 }
 
 const TOTAL_STEPS = 2;
@@ -65,6 +95,46 @@ export function Create() {
   const [opt3, setOpt3] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
+
+  // Draft persistence is off entirely (no restore, no save) for a visit
+  // arriving via Alias Polls' "Start a gathering" CTA (?title=...) —
+  // that's a deliberate fresh entry point with its own prefill, and a
+  // stale draft from an unrelated earlier visit shouldn't silently
+  // override it, nor should this one-off prefilled session overwrite
+  // whatever draft the organizer might already have going from a plain
+  // /create visit. Ordinary visits persist normally.
+  const draftsEnabled = Boolean(userId) && !searchParams.get('title');
+  const { restored: draftRestored, markSubmitted: markDraftSubmitted, discard: discardDraft } = useDraft<CreateDraft>({
+    key: userId ? `komon-draft-create-gathering-${userId}` : '',
+    enabled: draftsEnabled,
+    value: {
+      step, title, cat, date, time, location, capacity,
+      visibility, emails, costEnabled, costMethod, costTotal, items,
+      payMethod, payHandle, pollEnabled, pollQ, opt1, opt2, opt3,
+    },
+    onRestore: (d) => {
+      setStep(d.step);
+      setTitle(d.title);
+      setCat(d.cat);
+      setDate(d.date);
+      setTime(d.time);
+      setLocation(d.location);
+      setCapacity(d.capacity);
+      setVisibility(d.visibility);
+      setEmails(d.emails);
+      setCostEnabled(d.costEnabled);
+      setCostMethod(d.costMethod);
+      setCostTotal(d.costTotal);
+      setItems(d.items);
+      setPayMethod(d.payMethod);
+      setPayHandle(d.payHandle);
+      setPollEnabled(d.pollEnabled);
+      setPollQ(d.pollQ);
+      setOpt1(d.opt1);
+      setOpt2(d.opt2);
+      setOpt3(d.opt3);
+    },
+  });
 
   const itemTotal = useMemo(
     () => items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0),
@@ -160,6 +230,7 @@ export function Create() {
         pollOptions,
       });
 
+      markDraftSubmitted();
       navigate(`/created/${id}`);
     } catch (err) {
       console.error(err);
@@ -214,6 +285,18 @@ export function Create() {
               <div key={n} className={`wizard-dot${n === step ? ' active' : n < step ? ' done' : ''}`} />
             ))}
           </div>
+
+          {/* Rendered regardless of which step is active — this container
+              (unlike the step===1/step===2 blocks below and further down)
+              always renders, so the banner stays visible across both. */}
+          {draftRestored && (
+            <div className="draft-banner">
+              <span>Continuing where you left off.</span>
+              <button type="button" className="link-btn" onClick={discardDraft}>
+                Start fresh instead
+              </button>
+            </div>
+          )}
 
           {step === 1 && (
             <>
